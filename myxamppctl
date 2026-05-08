@@ -1,0 +1,69 @@
+#!/bin/bash
+INSTALL_DIR="/opt/myxampp"
+LOGS_DIR="$INSTALL_DIR/logs"
+PID_DIR="$INSTALL_DIR/var/run"
+APACHE_CONF="$INSTALL_DIR/apache/conf/httpd.conf"
+MYSQL_CONF="$INSTALL_DIR/mariadb/config/my.cnf"
+FTP_CONF="$INSTALL_DIR/etc/vsftpd.conf"
+APACHE_PID="$PID_DIR/apache2.pid"
+MYSQL_PID="$PID_DIR/mysqld.pid"
+FTP_PID="$PID_DIR/vsftpd.pid"
+
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOGS_DIR/myxampp.log"; }
+
+check_port() { ss -tlnp 2>/dev/null | grep -q ":$1 " && return 0 || return 1; }
+
+start_apache() {
+    check_port 80 && { log "WARNING: Port 80 in use"; return 1; }
+    /usr/sbin/apache2 -f "$APACHE_CONF" -k start 2>>"$LOGS_DIR/apache_error.log"
+    log "Apache started (PID: $(cat $APACHE_PID 2>/dev/null))"
+}
+stop_apache() {
+    /usr/sbin/apache2 -f "$APACHE_CONF" -k stop 2>/dev/null; log "Apache stopped"
+}
+start_mysql() {
+    check_port 3306 && { log "WARNING: Port 3306 in use"; return 1; }
+    /usr/sbin/mariadbd \
+        --defaults-file="$MYSQL_CONF" \
+        --datadir="$INSTALL_DIR/mariadb/data" \
+        --pid-file="$MYSQL_PID" \
+        --log-error="$LOGS_DIR/mariadb_error.log" &
+    log "MariaDB started"
+}
+stop_mysql() {
+    [ -f "$MYSQL_PID" ] && kill $(cat "$MYSQL_PID") 2>/dev/null; log "MariaDB stopped"
+}
+start_ftp() {
+    check_port 21 && { log "WARNING: Port 21 in use"; return 1; }
+    /usr/sbin/vsftpd "$FTP_CONF" &
+    echo $! > "$FTP_PID"; log "FTP started (PID: $!)"
+}
+stop_ftp() {
+    [ -f "$FTP_PID" ] && kill $(cat "$FTP_PID") 2>/dev/null; log "FTP stopped"
+}
+status_all() {
+    echo "=== MyXAMPP Service Status ==="
+    for svc in "Apache:80:$APACHE_PID" "MariaDB:3306:$MYSQL_PID" "FTP:21:$FTP_PID"; do
+        name=$(echo $svc|cut -d: -f1); port=$(echo $svc|cut -d: -f2)
+        pid_file=$(echo $svc|cut -d: -f3)
+        pid=$(cat "$pid_file" 2>/dev/null || echo "-")
+        if check_port $port; then
+            echo "  [ RUNNING ] $name | PID: $pid | Port: $port"
+        else
+            echo "  [ STOPPED ] $name | Port: $port"
+        fi
+    done
+}
+case "$1" in
+    start)        start_apache; start_mysql; start_ftp ;;
+    stop)         stop_apache; stop_mysql; stop_ftp ;;
+    restart)      stop_apache; stop_mysql; stop_ftp; sleep 1; start_apache; start_mysql; start_ftp ;;
+    status)       status_all ;;
+    start-apache) start_apache ;;
+    stop-apache)  stop_apache ;;
+    start-mysql)  start_mysql ;;
+    stop-mysql)   stop_mysql ;;
+    start-ftp)    start_ftp ;;
+    stop-ftp)     stop_ftp ;;
+    *) echo "Usage: myxamppctl {start|stop|restart|status|start-apache|stop-apache|start-mysql|stop-mysql|start-ftp|stop-ftp}"; exit 1 ;;
+esac
