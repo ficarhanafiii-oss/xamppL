@@ -49,18 +49,31 @@ jobs:
                 libqt6network6 libqt6dbus6 \
                 qt6-wayland
 
-              echo '[2/5] Configuring CMake...'
+              echo '[2/5] Verifying Qt6...'
+              pkg-config --modversion Qt6Core || echo 'Qt6Core not found via pkg-config'
+              qmake6 --version || true
+              find /usr -name 'Qt6WidgetsConfig.cmake' 2>/dev/null
+              find /usr -name 'libQt6Widgets*' 2>/dev/null
+
+              echo '[3/5] Configuring CMake...'
               mkdir -p build && cd build
               cmake .. \
                 -GNinja \
                 -DCMAKE_BUILD_TYPE=Release \
-                -DCMAKE_INSTALL_PREFIX=/opt/myxampp
+                -DCMAKE_INSTALL_PREFIX=/opt/myxampp \
+                -DCMAKE_VERBOSE_MAKEFILE=ON
               cd ..
 
-              echo '[3/5] Building...'
-              cd build && ninja -j\$(nproc) && cd ..
+              echo '[4/5] Building...'
+              cd build
+              ninja -j\$(nproc)
+              echo '--- Binary info ---'
+              ls -lh myxampp
+              file myxampp
+              ldd myxampp || true
+              cd ..
 
-              echo '[4/5] Packaging...'
+              echo '[5/5] Packaging...'
               mkdir -p artifact/myxampp/bin
               cp build/myxampp        artifact/myxampp/bin/
               cp myxamppctl           artifact/myxampp/bin/
@@ -75,9 +88,7 @@ jobs:
               chmod +x artifact/myxampp/scripts/*.sh
               cd artifact
               tar czf myxampp-arm64.tar.gz myxampp/
-
-              echo '[5/5] Build complete!'
-              ls -lh /work/artifact/
+              ls -lh myxampp-arm64.tar.gz
             "
 
       - name: Upload artifact
