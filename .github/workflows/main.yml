@@ -31,7 +31,7 @@ jobs:
               apt-get update -qq
               apt-get install -y \
                 build-essential cmake ninja-build \
-                pkg-config libssl-dev \
+                pkg-config libssl-dev file binutils \
                 libgl1-mesa-dev libgles2-mesa-dev \
                 libx11-dev libx11-xcb-dev \
                 libxcb1-dev libxcb-glx0-dev \
@@ -49,29 +49,21 @@ jobs:
                 libqt6network6 libqt6dbus6 \
                 qt6-wayland
 
-              echo '[2/5] Verifying Qt6...'
-              pkg-config --modversion Qt6Core || echo 'Qt6Core not found via pkg-config'
-              qmake6 --version || true
-              find /usr -name 'Qt6WidgetsConfig.cmake' 2>/dev/null
-              find /usr -name 'libQt6Widgets*' 2>/dev/null
-
-              echo '[3/5] Configuring CMake...'
+              echo '[2/5] Configuring CMake...'
               mkdir -p build && cd build
               cmake .. \
                 -GNinja \
                 -DCMAKE_BUILD_TYPE=Release \
-                -DCMAKE_INSTALL_PREFIX=/opt/myxampp \
-                -DCMAKE_VERBOSE_MAKEFILE=ON
+                -DCMAKE_INSTALL_PREFIX=/opt/myxampp
               cd ..
 
-              echo '[4/5] Building...'
-              cd build
-              ninja -j\$(nproc)
-              echo '--- Binary info ---'
-              ls -lh myxampp
-              file myxampp
-              ldd myxampp || true
-              cd ..
+              echo '[3/5] Building...'
+              cd build && ninja -j\$(nproc) && cd ..
+
+              echo '[4/5] Binary info...'
+              ls -lh build/myxampp
+              file build/myxampp
+              ldd build/myxampp | grep -i qt || echo 'Qt linked statically or check ldd'
 
               echo '[5/5] Packaging...'
               mkdir -p artifact/myxampp/bin
