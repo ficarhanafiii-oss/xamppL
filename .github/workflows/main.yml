@@ -1,0 +1,73 @@
+name: Build MyXAMPP ARM64
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-arm64:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU (ARM64 emulation)
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: arm64
+
+      - name: Build inside ARM64 container
+        run: |
+          docker run --rm --platform linux/arm64 \
+            -v ${{ github.workspace }}:/work \
+            -w /work \
+            ubuntu:22.04 bash -c "
+              set -e
+
+              echo '[1/4] Installing dependencies...'
+              apt-get update -qq
+              apt-get install -y \
+                build-essential cmake ninja-build \
+                qt6-base-dev qt6-base-dev-tools \
+                libqt6widgets6 libqt6network6 libqt6dbus6 \
+                qt6-tools-dev qt6-tools-dev-tools \
+                pkg-config libssl-dev
+
+              echo '[2/4] Configuring CMake...'
+              mkdir -p build && cd build
+              cmake .. \
+                -GNinja \
+                -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_INSTALL_PREFIX=/opt/myxampp
+
+              echo '[3/4] Building...'
+              ninja -j\$(nproc)
+
+              echo '[4/4] Done!'
+            "
+
+      - name: Package binary + configs
+        run: |
+          mkdir -p artifact/myxampp/bin
+          cp build/myxampp        artifact/myxampp/bin/
+          cp myxamppctl           artifact/myxampp/bin/
+          cp install.sh           artifact/myxampp/
+          cp build.sh             artifact/myxampp/
+          cp -r conf/             artifact/myxampp/
+          cp -r scripts/          artifact/myxampp/
+          cp README.md            artifact/myxampp/
+          chmod +x artifact/myxampp/bin/myxampp
+          chmod +x artifact/myxampp/bin/myxamppctl
+          chmod +x artifact/myxampp/install.sh
+          chmod +x artifact/myxampp/scripts/*.sh
+          cd artifact
+          tar czf myxampp-arm64.tar.gz myxampp/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: myxampp-arm64
+          path: artifact/myxampp-arm64.tar.gz
+          retention-days: 30
