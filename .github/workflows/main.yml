@@ -27,13 +27,27 @@ jobs:
               set -e
 
               echo '[1/4] Installing dependencies...'
+              export DEBIAN_FRONTEND=noninteractive
               apt-get update -qq
               apt-get install -y \
                 build-essential cmake ninja-build \
+                pkg-config libssl-dev \
+                libgl1-mesa-dev libgles2-mesa-dev \
+                libx11-dev libx11-xcb-dev \
+                libxcb1-dev libxcb-glx0-dev \
+                libxcb-icccm4-dev libxcb-image0-dev \
+                libxcb-keysyms1-dev libxcb-randr0-dev \
+                libxcb-render-util0-dev libxcb-shape0-dev \
+                libxcb-shm0-dev libxcb-sync-dev \
+                libxcb-xfixes0-dev libxcb-xinerama0-dev \
+                libxcb-xkb-dev libxkbcommon-dev \
+                libxkbcommon-x11-dev libfontconfig1-dev \
+                libfreetype6-dev libdbus-1-dev \
                 qt6-base-dev qt6-base-dev-tools \
-                libqt6widgets6 libqt6network6 libqt6dbus6 \
                 qt6-tools-dev qt6-tools-dev-tools \
-                pkg-config libssl-dev
+                libqt6widgets6 libqt6gui6 libqt6core6 \
+                libqt6network6 libqt6dbus6 \
+                qt6-wayland
 
               echo '[2/4] Configuring CMake...'
               mkdir -p build && cd build
@@ -58,16 +72,4 @@ jobs:
           cp -r conf/             artifact/myxampp/
           cp -r scripts/          artifact/myxampp/
           cp README.md            artifact/myxampp/
-          chmod +x artifact/myxampp/bin/myxampp
-          chmod +x artifact/myxampp/bin/myxamppctl
-          chmod +x artifact/myxampp/install.sh
-          chmod +x artifact/myxampp/scripts/*.sh
-          cd artifact
-          tar czf myxampp-arm64.tar.gz myxampp/
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: myxampp-arm64
-          path: artifact/myxampp-arm64.tar.gz
-          retention-days: 30
+          chmod +x artifact/myxampp
